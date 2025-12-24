@@ -31,7 +31,8 @@ export const generateVeoVideo = async (
 
     return operation;
   } catch (error: any) {
-    if (error.message?.includes("Requested entity was not found")) {
+    const errorStr = JSON.stringify(error) + (error.message || "");
+    if (errorStr.includes("Requested entity was not found")) {
       throw new Error("API_KEY_RESET_REQUIRED");
     }
     throw error;
@@ -40,12 +41,26 @@ export const generateVeoVideo = async (
 
 export const getOperationStatus = async (operation: any) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  return await ai.operations.getVideosOperation({ operation });
+  try {
+    return await ai.operations.getVideosOperation({ operation });
+  } catch (error: any) {
+    const errorStr = JSON.stringify(error) + (error.message || "");
+    if (errorStr.includes("Requested entity was not found")) {
+      throw new Error("API_KEY_RESET_REQUIRED");
+    }
+    throw error;
+  }
 };
 
 export const fetchVideoBlobUrl = async (uri: string): Promise<string> => {
   const response = await fetch(`${uri}&key=${process.env.API_KEY}`);
-  if (!response.ok) throw new Error("Failed to fetch video content");
+  if (!response.ok) {
+    const text = await response.text();
+    if (text.includes("Requested entity was not found") || response.status === 404) {
+      throw new Error("API_KEY_RESET_REQUIRED");
+    }
+    throw new Error(`Failed to fetch video content: ${response.status} ${text}`);
+  }
   const blob = await response.blob();
   return URL.createObjectURL(blob);
 };

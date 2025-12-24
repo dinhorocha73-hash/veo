@@ -1,3 +1,4 @@
+
 export type Resolution = '720p' | '1080p';
 export type AspectRatio = '16:9' | '9:16';
 
@@ -28,7 +29,7 @@ declare global {
   }
 
   interface Window {
-    // Add readonly to match the pre-configured global interface's modifiers
+    // Restored readonly to match the pre-configured global interface's modifiers.
     readonly aistudio: AIStudio;
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Copy of Veo Studio Pro",
-  "description": "A high-end cinematic video generation platform powered by Google's Veo 3.1 models. Create, extend, and refine AI-generated videos with ease.",
+  "name": "Veo Studio Pro",
+  "description": "Professional cinematic video generation platform powered by Google's Veo 3.1 models. Create high-fidelity video from text prompts and reference images.",
   "requestFramePermissions": []
 }
