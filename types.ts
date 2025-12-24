@@ -28,7 +28,7 @@ declare global {
   }
 
   interface Window {
-    // Remove readonly to ensure the declaration matches the pre-configured global interface
-    aistudio: AIStudio;
+    // Add readonly to match the pre-configured global interface's modifiers
+    readonly aistudio: AIStudio;
   }
 }

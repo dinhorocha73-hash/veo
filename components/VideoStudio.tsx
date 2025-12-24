@@ -1,8 +1,7 @@
-
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Wand2, Sparkles, Film, Clock, Download, 
-  Trash2, Play, Info, AlertCircle, RefreshCw,
+  Trash2, Info, AlertCircle, RefreshCw,
   Monitor, Smartphone, Image as ImageIcon, X, Upload, ExternalLink
 } from 'lucide-react';
 import { generateVeoVideo, getOperationStatus, fetchVideoBlobUrl, ImagePayload } from '../services/geminiService';
@@ -11,13 +10,6 @@ import { GeneratedVideo, Resolution, AspectRatio } from '../types';
 interface Props {
   onKeyReset: () => void;
 }
-
-const EXAMPLE_PROMPTS = [
-  "A majestic dragon flying over a crystalline lake at sunrise",
-  "Macro shot of a tiny astronaut exploring a garden of giant mushrooms",
-  "Cyberpunk street scene in Neo-Tokyo with flying cars",
-  "Slow motion ink drops colliding in water"
-];
 
 const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
   const [prompt, setPrompt] = useState('');
@@ -91,30 +83,30 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
 
       while (!operation.done) {
         const stage = Math.random();
-        if (stage < 0.2) setStatusMessage('Analyzing source image details...');
-        else if (stage < 0.4) setStatusMessage('Interpolating motion vectors...');
-        else if (stage < 0.6) setStatusMessage('Rendering physics and light rays...');
-        else if (stage < 0.8) setStatusMessage('Refining temporal consistency...');
+        if (stage < 0.2) setStatusMessage('Analyzing source details...');
+        else if (stage < 0.4) setStatusMessage('Calculating motion vectors...');
+        else if (stage < 0.6) setStatusMessage('Rendering physics...');
+        else if (stage < 0.8) setStatusMessage('Refining consistency...');
         else setStatusMessage('Applying final color grading...');
 
         await new Promise(resolve => setTimeout(resolve, 10000));
         operation = await getOperationStatus(operation);
       }
 
-      // Check for server-side errors in the operation itself
+      // Check for specific server-side errors in the operation response
       if (operation.error) {
         throw new Error(operation.error.message || "The video generation failed on the server.");
       }
 
-      if (operation.response?.generatedVideos?.[0]?.video?.uri) {
+      const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+      if (videoUri) {
         setStatusMessage('Finalizing download link...');
-        const videoUri = operation.response.generatedVideos[0].video.uri;
         const blobUrl = await fetchVideoBlobUrl(videoUri);
         
         const newVideo: GeneratedVideo = {
           id: Date.now().toString(),
           url: blobUrl,
-          prompt: prompt || 'Image-to-Video Generation',
+          prompt: prompt || 'Image-to-Video Animation',
           resolution,
           aspectRatio,
           createdAt: Date.now()
@@ -124,21 +116,23 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
         setPrompt('');
         clearImage();
       } else {
-        throw new Error("Video generation completed but no video content was returned. This might be a temporary API issue.");
+        throw new Error("Generation completed but no video content was returned. This can happen if the content was flagged by safety filters.");
       }
     } catch (err: any) {
-      console.error("Studio Generation Error Details:", err);
+      console.error("Studio Generation Error:", err);
       
       let rawMsg = err.message || '';
       let cleanMsg = rawMsg;
 
-      // Try to parse JSON errors from the API
+      // Try to parse SDK JSON errors (common for 429s)
       try {
         const parsed = JSON.parse(rawMsg);
         if (parsed.error?.message) cleanMsg = parsed.error.message;
       } catch (e) {}
 
-      const isQuotaError = cleanMsg.includes("RESOURCE_EXHAUSTED") || cleanMsg.includes("429") || cleanMsg.toLowerCase().includes("quota");
+      const isQuotaError = cleanMsg.includes("RESOURCE_EXHAUSTED") || 
+                          cleanMsg.includes("429") || 
+                          cleanMsg.toLowerCase().includes("quota");
 
       if (rawMsg === "API_KEY_RESET_REQUIRED") {
         setError(null);
@@ -148,7 +142,7 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
       
       if (isQuotaError) {
         setError({
-          message: "You've exceeded your current API quota. Please check your billing plan or usage limits in the Google AI Studio console.",
+          message: "API Quota Exceeded. Please check your billing project in Google AI Studio or try again in a few minutes.",
           isQuota: true
         });
       } else {
@@ -179,7 +173,7 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
             <div className="w-8 h-8 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
               <Film className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight">Veo Studio</h1>
+            <h1 className="text-xl font-bold tracking-tight">Veo Studio Pro</h1>
           </div>
           <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded-full uppercase tracking-widest font-bold">
             v3.1 Preview
@@ -192,14 +186,14 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
           <section className="bg-slate-900/50 rounded-3xl border border-slate-800 p-6 space-y-6">
             
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-400">Reference Image (Image-to-Video)</label>
+              <label className="text-sm font-semibold text-slate-400">Source Image</label>
               {!selectedImage ? (
                 <div 
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full h-32 border-2 border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-slate-300 hover:border-blue-500/50 transition-all cursor-pointer group"
                 >
                   <Upload className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                  <span className="text-sm font-medium">Click or drag image to animate</span>
+                  <span className="text-sm font-medium">Click to upload reference image</span>
                   <input 
                     type="file" 
                     ref={fileInputRef} 
@@ -224,11 +218,11 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-400">Motion Prompt</label>
+              <label className="text-sm font-semibold text-slate-400">Prompt & Motion Instructions</label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder={selectedImage ? "Describe how to animate the image..." : "Describe a scene from scratch..."}
+                placeholder={selectedImage ? "How should this image move? (e.g. 'Slow cinematic zoom into the trees')" : "Describe your scene from scratch..."}
                 disabled={isGenerating}
                 className="w-full h-32 bg-slate-950 border border-slate-800 rounded-2xl p-4 text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none"
               />
@@ -236,7 +230,7 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Quality</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Target Resolution</label>
                 <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
                   {(['720p', '1080p'] as Resolution[]).map((res) => (
                     <button
@@ -253,7 +247,7 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Canvas</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Aspect Ratio</label>
                 <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
                   {(['16:9', '9:16'] as AspectRatio[]).map((ratio) => (
                     <button
@@ -273,31 +267,21 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
             </div>
 
             {error && (
-              <div className={`border p-4 rounded-xl flex flex-col gap-3 text-sm animate-fade-in ${error.isQuota ? 'bg-orange-500/10 border-orange-500/50 text-orange-400' : 'bg-red-500/10 border-red-500/50 text-red-400'}`}>
+              <div className={`border p-4 rounded-xl flex flex-col gap-3 text-sm animate-in fade-in slide-in-from-top-2 ${error.isQuota ? 'bg-orange-500/10 border-orange-500/50 text-orange-400' : 'bg-red-500/10 border-red-500/50 text-red-400'}`}>
                 <div className="flex gap-3">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
                   <div className="space-y-1">
-                    <p className="font-bold">{error.isQuota ? 'Quota Exceeded' : 'Generation Error'}</p>
-                    <p className="opacity-90">{error.message}</p>
+                    <p className="font-bold">{error.isQuota ? 'Quota Limit Reached' : 'System Error'}</p>
+                    <p className="opacity-90 leading-tight">{error.message}</p>
                   </div>
                 </div>
                 {error.isQuota && (
                   <div className="flex flex-wrap gap-x-4 gap-y-2 pt-2 border-t border-orange-500/20">
-                    <a 
-                      href="https://aistudio.google.com/app/usage" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs font-bold hover:underline"
-                    >
+                    <a href="https://aistudio.google.com/app/usage" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-bold hover:underline">
                       Usage Dashboard <ExternalLink size={12} />
                     </a>
-                    <a 
-                      href="https://ai.google.dev/gemini-api/docs/billing" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs font-bold hover:underline"
-                    >
-                      Billing Info <ExternalLink size={12} />
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-bold hover:underline">
+                      Billing Setup <ExternalLink size={12} />
                     </a>
                   </div>
                 )}
@@ -316,12 +300,12 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
               {isGenerating ? (
                 <>
                   <RefreshCw className="w-5 h-5 animate-spin text-blue-400" />
-                  Generating...
+                  Processing Video...
                 </>
               ) : (
                 <>
                   {selectedImage ? <Sparkles className="w-5 h-5" /> : <Wand2 className="w-5 h-5" />}
-                  {selectedImage ? 'Animate Image' : 'Create Video'}
+                  {selectedImage ? 'Animate Reference' : 'Generate Cinematic Clip'}
                 </>
               )}
             </button>
@@ -342,10 +326,10 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
           <section className="bg-slate-900/30 rounded-3xl border border-slate-800/50 p-6">
             <div className="flex items-center gap-3 mb-4">
               <Info className="w-5 h-5 text-slate-500" />
-              <h2 className="font-semibold text-slate-300">Veo 3.1 Pro Tips</h2>
+              <h2 className="font-semibold text-slate-300">Veo 3.1 Capabilities</h2>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              For best results with Image-to-Video, use high-resolution source images and describe the specific movement you want (e.g., "gentle sway of trees", "camera zooming slowly into the subject").
+              Veo 3.1 models excel at temporal consistency. In Image-to-Video mode, ensure your prompt matches the lighting and style of the uploaded frame for the most fluid cinematic results.
             </p>
           </section>
         </div>
@@ -364,12 +348,12 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
               <div className="p-4 bg-slate-900 rounded-2xl">
                 <ImageIcon size={48} className="opacity-20" />
               </div>
-              <p className="text-center px-8">Start your journey.<br/>Upload an image or type a prompt.</p>
+              <p className="text-center px-8 font-medium">Your cinematic library is empty.<br/>Upload an image or prompt the AI to begin.</p>
             </div>
           ) : (
             <div className="space-y-8 pb-12">
               {history.map((video) => (
-                <article key={video.id} className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl group animate-fade-in">
+                <article key={video.id} className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className={`relative bg-black flex items-center justify-center overflow-hidden ${video.aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[700px] mx-auto' : 'aspect-video'}`}>
                     <video 
                       src={video.url} 
@@ -397,15 +381,15 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
                       <div className="flex items-center gap-2 shrink-0">
                         <a 
                           href={video.url} 
-                          download={`veo-generation-${video.id}.mp4`}
-                          className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all active:scale-95 shadow-lg"
+                          download={`veo-clip-${video.id}.mp4`}
+                          className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all active:scale-95"
                           title="Download"
                         >
                           <Download size={20} />
                         </a>
                         <button 
                           onClick={() => removeVideo(video.id)}
-                          className="p-3 bg-slate-800 hover:bg-red-900/50 hover:text-red-400 text-slate-300 rounded-xl transition-all active:scale-95 shadow-lg"
+                          className="p-3 bg-slate-800 hover:bg-red-900/50 hover:text-red-400 text-slate-300 rounded-xl transition-all active:scale-95"
                           title="Delete"
                         >
                           <Trash2 size={20} />
@@ -423,18 +407,11 @@ const VideoStudio: React.FC<Props> = ({ onKeyReset }) => {
       <style>{`
         @keyframes progress {
           0% { transform: scaleX(0); }
-          50% { transform: scaleX(0.7); }
-          100% { transform: scaleX(0.95); }
+          50% { transform: scaleX(0.6); }
+          100% { transform: scaleX(0.98); }
         }
         .animate-progress {
-          animation: progress 90s cubic-bezier(0.1, 0, 0, 1) forwards;
-        }
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+          animation: progress 95s cubic-bezier(0.1, 0, 0, 1) forwards;
         }
       `}</style>
     </div>
